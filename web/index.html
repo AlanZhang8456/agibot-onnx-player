@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ONNX 播放器 · 灵犀 X2 / 远征 A3</title>
+  <link rel="stylesheet" href="/web/src/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◈</span>
+      <div class="brand-text">
+        <h1>ONNX 播放器 · 灵犀 X2 / 远征 A3</h1>
+        <p>本地推理轨迹 · three.js 逐帧回放</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="server-pill" id="server-pill" title="本地后端服务状态">
+        <span class="dot" id="server-dot"></span>
+        <span id="server-text">连接中…</span>
+      </div>
+      <label class="model-pick">
+        <span>模型</span>
+        <select id="model-select" title="默认按 /api/tracks 的 modelHint 自动选择；选错时可手动覆盖"></select>
+      </label>
+      <button id="btn-retry" class="btn btn-sm" title="重新连接后端 / 刷新资源库">重试</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- ============ 左侧资源库 ============ -->
+    <aside class="library">
+      <div class="lib-head">
+        <h2>资源库</h2>
+        <button id="btn-refresh" class="btn btn-sm" title="重新扫描资源目录">刷新</button>
+      </div>
+      <div class="lib-tools">
+        <label class="root-row">
+          <span>根目录</span>
+          <select id="root-select"></select>
+        </label>
+        <input id="search-input" class="search-input" type="search" placeholder="搜索资源名 / 路径…" spellcheck="false">
+        <div class="manual-row" title="不在根目录里的 ONNX 也可以直接粘贴绝对路径加载">
+          <input id="manual-path-input" class="manual-input" type="text" placeholder="手动路径：粘贴 ONNX 绝对路径…" spellcheck="false" autocomplete="off">
+          <button id="btn-load-path" class="btn btn-sm" title="按绝对路径加载（Enter 也可）">加载</button>
+        </div>
+      </div>
+      <div class="lib-hint" id="lib-hint">等待后端连接…</div>
+      <div class="entry-list" id="entry-list"></div>
+      <div class="lib-foot" id="lib-count"></div>
+    </aside>
+
+    <!-- ============ 中间 3D 视图 + 播放条 ============ -->
+    <section class="center">
+      <div class="viewport" id="viewport">
+        <canvas id="viewer-canvas"></canvas>
+
+        <div class="view-toolbar">
+          <div class="now-playing" id="now-playing">未选择资源</div>
+          <div class="view-actions">
+            <label class="check ghost-check" id="ghost-toggle-wrap" hidden>
+              <input type="checkbox" id="ghost-toggle"> 叠加 ghost
+            </label>
+            <button id="btn-reset-view" class="btn btn-sm" title="重置相机视角">重置视角</button>
+          </div>
+        </div>
+
+        <div class="view-hint" id="view-hint">
+          <kbd>左键</kbd>旋转 <span class="sep">·</span>
+          <kbd>右键</kbd>平移 <span class="sep">·</span>
+          <kbd>滚轮</kbd>缩放
+        </div>
+
+        <div class="view-overlay" id="view-overlay" hidden>
+          <div class="spinner"></div>
+          <div class="overlay-text">
+            <strong id="view-overlay-title">加载中…</strong>
+            <p id="view-overlay-text"></p>
+            <div class="load-progress" id="load-progress" hidden><i id="load-progress-fill"></i></div>
+            <p class="load-elapsed" id="load-elapsed" hidden></p>
+          </div>
+        </div>
+
+        <div class="offline-overlay" id="offline-overlay" hidden>
+          <div class="offline-icon">⚡</div>
+          <h3>后端未连接</h3>
+          <p id="offline-detail">无法访问本地 ONNX 播放服务（默认 127.0.0.1:8766）。请先启动后端，然后重试。</p>
+          <button id="btn-offline-retry" class="btn btn-primary">重试连接</button>
+        </div>
+
+        <div class="view-error" id="view-error" hidden>
+          <span id="view-error-text"></span>
+          <button id="btn-dismiss-error" class="btn btn-sm btn-ghost" title="关闭">✕</button>
+        </div>
+      </div>
+
+      <div class="transport" id="transport">
+        <button id="btn-play" class="play-btn" title="播放 / 暂停（空格）">▶</button>
+        <button id="btn-replay" class="icon-btn" title="重播">⟲</button>
+        <div class="time-display"><span id="time-current">0.00</span> / <span id="time-total">0.00</span><span class="unit">s</span></div>
+        <input id="timeline" class="timeline" type="range" min="0" max="0" step="1" value="0" disabled>
+        <label class="select-field speed-field"><span>倍速</span>
+          <select id="speed-select">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label class="check loop-check"><input type="checkbox" id="loop-toggle" checked> 循环</label>
+        <div class="fps-info" id="fps-info">-- fps</div>
+      </div>
+    </section>
+
+    <!-- ============ 右侧信息面板 ============ -->
+    <aside class="inspector">
+      <div class="tabs">
+        <button class="tab active" data-tab="meta">元数据</button>
+        <button class="tab" data-tab="joints">关节</button>
+      </div>
+
+      <div class="tab-panel" id="tab-meta">
+        <div class="tab-body" id="meta-body">
+          <p class="empty">从左侧资源库选择一个可播放的 ONNX 资源。</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-joints" hidden>
+        <div class="joint-panel">
+          <div class="joint-summary">
+            <span id="joints-count">0 个关节</span>
+            <span class="muted" id="joints-frame">帧 - / -</span>
+          </div>
+          <div class="curve-card">
+            <canvas id="joint-curve"></canvas>
+            <div class="curve-caption" id="curve-caption">选中关节后显示角度曲线</div>
+          </div>
+          <div class="joint-list" id="joint-list">
+            <p class="empty">暂无可播放轨迹。</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast-stack" id="toast-stack"></div>
+  <script type="module" src="/web/dist/app.js"></script>
+</body>
+</html>

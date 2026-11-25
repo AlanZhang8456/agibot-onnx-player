@@ -1,0 +1,9 @@
+{
+  "port": 8767,
+  "roots": [
+    {
+      "path": "C:/path/to/your/agibot/actions",
+      "label": "我的动作资源目录"
+    }
+  ]
+}

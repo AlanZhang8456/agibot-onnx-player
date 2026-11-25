@@ -1,0 +1,13 @@
+[
+  {
+    "kind": "a3",
+    "name": "A3 示例动作",
+    "onnx": "C:/path/to/your/a3_action/data.onnx",
+    "csv": "C:/path/to/your/a3_action/data.csv"
+  },
+  {
+    "kind": "x2",
+    "name": "X2 示例动作",
+    "onnx": "C:/path/to/your/x2_action/policy.onnx"
+  }
+]

@@ -1,0 +1,35 @@
+# Python / 构建产物
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pylibs/
+.packenv/
+.venv/
+venv/
+node_modules/
+build_exe/
+dist_exe/
+packaging/bundle/
+*.spec
+
+# 生成的 mjswan 数据（体积大/来自官方模型资源）
+mjswan/site/
+mjswan/cache/
+mjswan/player/app/
+mjswan/player/templates/*.mjz
+mjswan/player/runtime/
+
+# 模型 / 动作资源（不随仓库分发）
+models/
+assets/samples/
+!assets/samples/.gitkeep
+
+# 本机配置与缓存
+config.json
+!config.example.json
+.cache/
+scratch/
+publish/
+
+# 任意压缩包
+*.zip
